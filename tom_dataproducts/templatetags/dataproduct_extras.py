@@ -280,8 +280,11 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
     for src in allsrc:
         photometry_data.setdefault( src.filterName, { 'time': [], 'magnitude': [], 'error': [], 'limit': [] } )
         photometry_data[ src.filterName ][ 'time' ].append( src.midPointTai )
-        photometry_data[ src.filterName ][ 'magnitude' ].append( -2.5*np.log10( src.psFlux ) + 29 )
-        photometry_data[ src.filterName ][ 'error' ].append( -2.5 / np.log(10) * src.psFluxErr / src.psFlux )
+        if ( src.psFlux > 5.*src.psFluxErr ):
+            photometry_data[ src.filterName ][ 'magnitude' ].append( -2.5*np.log10( src.psFlux ) + 31.4 )
+            photometry_data[ src.filterName ][ 'error' ].append( -2.5 / np.log(10) * src.psFluxErr / src.psFlux )
+        else:
+            photometry_data[ src.filterName ][ 'limit' ].append( -2.5*np.log10( 5*src.psFluxErr ) + 31.4 )
         
     # ****************************************
     
