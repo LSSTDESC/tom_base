@@ -23,6 +23,8 @@ from tom_dataproducts.processors.data_serializers import SpectrumSerializer
 from tom_observations.models import ObservationRecord
 from tom_targets.models import Target
 
+from elasticc2.models import DiaObject, DiaSource, DiaForcedSource
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
@@ -243,22 +245,46 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
     }
 
     photometry_data = {}
-    if settings.TARGET_PERMISSIONS_ONLY:
-        datums = ReducedDatum.objects.filter(target=target, data_type=settings.DATA_PRODUCT_TYPES['photometry'][0])
-    else:
-        datums = get_objects_for_user(context['request'].user,
-                                      'tom_dataproducts.view_reduceddatum',
-                                      klass=ReducedDatum.objects.filter(
-                                        target=target,
-                                        data_type=settings.DATA_PRODUCT_TYPES['photometry'][0]))
+    # if settings.TARGET_PERMISSIONS_ONLY:
+    #     datums = ReducedDatum.objects.filter(target=target, data_type=settings.DATA_PRODUCT_TYPES['photometry'][0])
+    # else:
+    #     datums = get_objects_for_user(context['request'].user,
+    #                                   'tom_dataproducts.view_reduceddatum',
+    #                                   klass=ReducedDatum.objects.filter(
+    #                                     target=target,
+    #                                     data_type=settings.DATA_PRODUCT_TYPES['photometry'][0]))
+    # 
+    # for datum in datums:
+    #     photometry_data.setdefault(datum.value['filter'], {})
+    #     photometry_data[datum.value['filter']].setdefault('time', []).append(datum.timestamp)
+    #     photometry_data[datum.value['filter']].setdefault('magnitude', []).append(datum.value.get('magnitude'))
+    #     photometry_data[datum.value['filter']].setdefault('error', []).append(datum.value.get('error'))
+    #     photometry_data[datum.value['filter']].setdefault('limit', []).append(datum.value.get('limit'))
 
-    for datum in datums:
-        photometry_data.setdefault(datum.value['filter'], {})
-        photometry_data[datum.value['filter']].setdefault('time', []).append(datum.timestamp)
-        photometry_data[datum.value['filter']].setdefault('magnitude', []).append(datum.value.get('magnitude'))
-        photometry_data[datum.value['filter']].setdefault('error', []).append(datum.value.get('error'))
-        photometry_data[datum.value['filter']].setdefault('limit', []).append(datum.value.get('limit'))
+    # ****************************************
+    # RKNOP 2023-04-10
+    # Replace this to read from the elasticc2.DiaSource and DiaForcedSource tables,
+    # and hack them into something the rest of the method expects.
+    #
+    # this is temporary... the table structure needs to be rethought
 
+    # Have I mentioned recently that ORM syntax tends to be very obtuse and byzantine, and code
+    # would all be much clearer if we just wrote SQL?
+    obj = DiaObject.objects.filter( diaobjectoftarget__tomtarget_id=target.pk ).first()
+    srcs = DiaSource.objects.filter( diaObject_id=obj.pk )
+    frcsrcs = ( DiaForcedSource.objects
+                .filter( diaObject_id=obj.pk)
+                .exclude( pk__in=[ src.pk for src in srcs ] ) )
+    allsrc = list(srcs) + list(frcsrcs)
+    datums = []
+    for src in allsrc:
+        photometry_data.setdefault( src.filterName, { 'time': [], 'magnitude': [], 'error': [], 'limit': [] } )
+        photometry_data[ src.filterName ][ 'time' ].append( src.midPointTai )
+        photometry_data[ src.filterName ][ 'magnitude' ].append( -2.5*np.log10( src.psFlux ) + 29 )
+        photometry_data[ src.filterName ][ 'error' ].append( -2.5 / np.log(10) * src.psFluxErr / src.psFlux )
+        
+    # ****************************************
+    
     plot_data = []
     all_ydata = []
     for filter_name, filter_values in photometry_data.items():
