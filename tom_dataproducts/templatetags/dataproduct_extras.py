@@ -271,20 +271,20 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
     # Have I mentioned recently that ORM syntax tends to be very obtuse and byzantine, and code
     # would all be much clearer if we just wrote SQL?
     obj = DiaObject.objects.filter( diaobjectoftarget__tomtarget_id=target.pk ).first()
-    srcs = DiaSource.objects.filter( diaObject_id=obj.pk )
+    srcs = DiaSource.objects.filter( diaobject_id=obj.pk )
     frcsrcs = ( DiaForcedSource.objects
-                .filter( diaObject_id=obj.pk)
+                .filter( diaobject_id=obj.pk)
                 .exclude( pk__in=[ src.pk for src in srcs ] ) )
     allsrc = list(srcs) + list(frcsrcs)
     datums = []
     for src in allsrc:
-        photometry_data.setdefault( src.filterName, { 'time': [], 'magnitude': [], 'error': [], 'limit': [] } )
-        photometry_data[ src.filterName ][ 'time' ].append( src.midPointTai )
-        if ( src.psFlux > 5.*src.psFluxErr ):
-            photometry_data[ src.filterName ][ 'magnitude' ].append( -2.5*np.log10( src.psFlux ) + 31.4 )
-            photometry_data[ src.filterName ][ 'error' ].append( -2.5 / np.log(10) * src.psFluxErr / src.psFlux )
+        photometry_data.setdefault( src.filtername, { 'time': [], 'magnitude': [], 'error': [], 'limit': [] } )
+        photometry_data[ src.filtername ][ 'time' ].append( src.midpointtai )
+        if ( src.psflux > 5.*src.psfluxerr ):
+            photometry_data[ src.filtername ][ 'magnitude' ].append( -2.5*np.log10( src.psflux ) + 31.4 )
+            photometry_data[ src.filtername ][ 'error' ].append( -2.5 / np.log(10) * src.psfluxerr / src.psflux )
         else:
-            photometry_data[ src.filterName ][ 'limit' ].append( -2.5*np.log10( 5*src.psFluxErr ) + 31.4 )
+            photometry_data[ src.filtername ][ 'limit' ].append( -2.5*np.log10( 5*src.psfluxerr ) + 31.4 )
         
     # ****************************************
     
